@@ -4,7 +4,7 @@ No overheads, no hidden magic.
 
 ## Installation setup
 
-```composer install talanov/data-transfer```
+```composer require talanov/data-transfer```
 
 ## Usage
 
@@ -27,4 +27,14 @@ final class AccountData extends DataTransferObject
 
     public ?string $description = null;
 }
+```
+
+```php
+$account = new AccountData([
+    'name' => 'My account',
+    'currency' => 'EUR',
+    'iban' => 'DE89370400440532013000',
+    'balance' => '123.45',
+    'description' => 'My first account',
+]);
 ```

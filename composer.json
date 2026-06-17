@@ -5,7 +5,7 @@
     "type": "library",
     "require": {
         "php": "^8.4",
-        "nesbot/carbon": "^3.12.3"
+        "nesbot/carbon": "^3"
     },
     "autoload": {
         "psr-4": {

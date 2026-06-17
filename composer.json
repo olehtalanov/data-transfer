@@ -1,0 +1,22 @@
+{
+    "name": "talanov/data-transfer",
+    "description": "Simple library of Data Transfer Object for PHP",
+    "license": ["MIT"],
+    "type": "library",
+    "require": {
+        "php": "^8.4",
+        "nesbot/carbon": "^3.12.3"
+    },
+    "autoload": {
+        "psr-4": {
+            "Talanov\\DataTransfer\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Oleh Talanov",
+            "email": "talanov.o@gmail.com"
+        }
+    ],
+    "minimum-stability": "dev"
+}

@@ -7,20 +7,25 @@ namespace Talanov\DataTransfer;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
+use Exception;
+use JsonSerializable;
 use ReflectionClass;
+use ReflectionException;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionType;
 use Talanov\DataTransfer\Attributes\Cast;
+use Talanov\DataTransfer\Attributes\MapInputName;
 use Talanov\DataTransfer\Concerns\CastInterface;
 use Talanov\DataTransfer\Traits\ResponseTrait;
+use Throwable;
 use UnitEnum;
 
-abstract class DataTransferObject
+abstract class DataTransferObject implements JsonSerializable
 {
     use ResponseTrait;
 
-    protected string $__property_name;
+    protected ?ReflectionClass $__reflection = null;
 
     public function __construct(...$data)
     {
@@ -57,34 +62,44 @@ abstract class DataTransferObject
         return array_diff_key($original, $exclude);
     }
 
+    protected function getReflection(): ReflectionClass
+    {
+        if (!isset($this->__reflection)) {
+            $this->__reflection = new ReflectionClass($this);
+        }
+
+        return $this->__reflection;
+    }
+
     private function castAndFill(array $data): void
     {
-        $reflection = new ReflectionClass($this);
+        foreach ($this->getReflection()->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+            $propertyName = $property->getName();
+            $inputNameAttrs = $property->getAttributes(MapInputName::class);
+            $inputKey = $inputNameAttrs !== [] ? $inputNameAttrs[0]->newInstance()->name : $propertyName;
+            $value = $data[$inputKey] ?? null;
 
-        foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
-            $this->__property_name = $property->getName();
-            $value = $data[$this->__property_name] ?? null;
-
-            // Check for Cast attribute
-            $castAttribute = $property->getAttributes(Cast::class)[0] ?? null;
+            $castAttrs = $property->getAttributes(Cast::class);
+            $castAttribute = $castAttrs !== [] ? $castAttrs[0] : null;
 
             if ($castAttribute) {
                 /** @var Cast $cast */
                 $cast = $castAttribute->newInstance();
-                $value = $this->castValue($value, $cast->type, $cast->default);
-            } // Fallback to native PHP type
-            elseif ($property->hasType()) {
-                $value = $this->castToNativeType($value, $property->getType());
+                $value = $this->castValue($value, $cast->type, $cast->default, $propertyName);
+            } elseif ($property->hasType()) {
+                $value = $this->castToNativeType($value, $property->getType(), $propertyName);
             }
 
-            // Set value if possible
-            if (! $property->isInitialized($this) || $value !== null || $property->getType()?->allowsNull()) {
+            if (!$property->isInitialized($this) || $value !== null || $property->getType()?->allowsNull()) {
                 $property->setValue($this, $value);
             }
         }
     }
 
-    private function castValue(mixed $value, string|UnitEnum $castType, mixed $default = null): mixed
+    /**
+     * @throws Exception
+     */
+    private function castValue(mixed $value, string|UnitEnum $castType, mixed $default = null, ?string $propertyName = null): mixed
     {
         if ($value === null) {
             return $default;
@@ -94,11 +109,15 @@ abstract class DataTransferObject
             return $this->castToEnum($value, $castType);
         }
 
-        return $this->caster($value, $castType);
+        return $this->caster($value, $castType, $propertyName);
     }
 
-    private function castToNativeType(mixed $value, ReflectionType $type): mixed
+    private function castToNativeType(mixed $value, ReflectionType $type, ?string $propertyName = null): mixed
     {
+        if ($value === null) {
+            return null;
+        }
+
         if ($type instanceof ReflectionNamedType) {
             $typeName = $type->getName();
 
@@ -106,39 +125,35 @@ abstract class DataTransferObject
                 return $this->castToEnum($value, $typeName);
             }
 
-            return $this->caster($value, $typeName);
+            return $this->caster($value, $typeName, $propertyName);
         }
 
         return $value;
     }
 
-    private function caster(mixed $value, mixed $castType): mixed
+    private function caster(mixed $value, mixed $castType, ?string $propertyName = null): mixed
     {
-        if ($value === null) {
-            return null;
-        }
-
         try {
             return match ($castType) {
-                'int', 'integer' => (int) $value,
-                'abs_int', 'abs_integer' => abs((int) $value),
-                'float', 'double' => (float) $value,
-                'abs_float', 'abs_double' => abs((float) $value),
+                'int', 'integer' => (int)$value,
+                'abs_int', 'abs_integer' => abs((int)$value),
+                'float', 'double' => (float)$value,
+                'abs_float', 'abs_double' => abs((float)$value),
                 'bool', 'boolean' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-                'string' => (string) $value,
-                'array' => (array) $value,
+                'string' => (string)$value,
+                'array' => (array)$value,
                 'datetime' => $this->castToDateTime($value),
                 default => $this->resolveCustomCast($value, $castType),
             };
-        } catch (\Throwable $exception) {
-            throw new \Exception("Value of [$this->__property_name] are invalid. " . $exception->getMessage());
+        } catch (Throwable $exception) {
+            throw new Exception("Value of [$propertyName] is invalid. " . $exception->getMessage());
         }
     }
 
     /**
-     * @throws \ReflectionException
+     * @throws ReflectionException
      */
-    private function resolveCustomCast($value, $castType): mixed
+    private function resolveCustomCast(mixed $value, mixed $castType): mixed
     {
         $reflection = new ReflectionClass($castType);
         if ($reflection->implementsInterface(CastInterface::class)) {
@@ -154,7 +169,7 @@ abstract class DataTransferObject
             return $value;
         }
 
-        if (! enum_exists($enumClass)) {
+        if (!enum_exists($enumClass)) {
             return null;
         }
 
@@ -162,7 +177,6 @@ abstract class DataTransferObject
             return $enumClass::tryFrom($value);
         }
 
-        // For pure UnitEnum (try to match by name)
         if (is_string($value)) {
             $value = strtoupper($value);
             foreach ($enumClass::cases() as $case) {
@@ -184,7 +198,7 @@ abstract class DataTransferObject
         if (is_string($value) && $value !== '') {
             try {
                 return new CarbonImmutable($value);
-            } catch (\Exception) {
+            } catch (Exception) {
                 return null;
             }
         }

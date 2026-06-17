@@ -11,6 +11,7 @@ use Talanov\DataTransfer\Casts\UppercaseCast;
 use Talanov\DataTransfer\Tests\Support\CastedDto;
 use Talanov\DataTransfer\Tests\Support\HiddenDto;
 use Talanov\DataTransfer\Tests\Support\MappedDto;
+use Talanov\DataTransfer\Tests\Support\MappedInputDto;
 use Talanov\DataTransfer\Tests\Support\SimpleDto;
 use Talanov\DataTransfer\Tests\Support\TestStatus;
 
@@ -112,6 +113,29 @@ final class DataTransferObjectTest extends TestCase
     public function test_it_maps_output_names(): void
     {
         $dto = new MappedDto(['name' => 'John', 'age' => 30]);
+        $this->assertSame(['full_name' => 'John', 'user_age' => 30], $dto->toArray());
+    }
+
+    public function test_it_maps_input_names(): void
+    {
+        $dto = new MappedInputDto(['full_name' => 'John', 'user_age' => 30]);
+        $this->assertSame('John', $dto->name);
+        $this->assertSame(30, $dto->age);
+    }
+
+    public function test_it_maps_input_name_treats_unmatched_as_null(): void
+    {
+        $dto = new MappedInputDto(['full_name' => 'John', 'user_age' => 30]);
+        $this->assertSame('John', $dto->name);
+        $this->assertSame(30, $dto->age);
+        $this->assertNull($dto->email);
+    }
+
+    public function test_it_combines_input_and_output_mapping(): void
+    {
+        $dto = new MappedDto(['name' => 'John', 'age' => 30]);
+        $this->assertSame('John', $dto->name);
+        $this->assertSame(30, $dto->age);
         $this->assertSame(['full_name' => 'John', 'user_age' => 30], $dto->toArray());
     }
 

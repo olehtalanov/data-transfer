@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Talanov\DataTransfer\Traits;
 
-use ReflectionClass;
 use ReflectionProperty;
 use Talanov\DataTransfer\Attributes\Hidden;
 use Talanov\DataTransfer\Attributes\MapOutputName;
@@ -12,6 +11,11 @@ use Talanov\DataTransfer\Attributes\MapOutputName;
 trait ResponseTrait
 {
     protected array $__extras = [];
+
+    public function __isset(string $propertyName): bool
+    {
+        return array_key_exists($propertyName, $this->__extras);
+    }
 
     public function __get(string $propertyName): mixed
     {
@@ -22,14 +26,14 @@ trait ResponseTrait
         return null;
     }
 
-    public function merge(mixed $data): static
+    public function merge(array $data): static
     {
         $this->__extras = array_merge($this->__extras, $data);
 
         return $this;
     }
 
-    public function mergeWhen(bool $condition, mixed $data): static
+    public function mergeWhen(bool $condition, array $data): static
     {
         if ($condition) {
             $this->merge($data);
@@ -45,20 +49,18 @@ trait ResponseTrait
 
     public function jsonSerialize(): array
     {
-        return $this->toArray();
+        return $this->transform();
     }
 
-    public function toJson($options = 0): false|string
+    public function toJson(int $options = 0): false|string
     {
         return json_encode($this->toArray(), $options);
     }
 
     protected function transform(): array
     {
-        $reflection = new ReflectionClass($this);
-
         $params = [];
-        foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+        foreach ($this->getReflection()->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
             if ($property->getAttributes(Hidden::class)) {
                 continue;
             }
@@ -74,8 +76,6 @@ trait ResponseTrait
             $params[$outputName] = $this->$name ?? null;
         }
 
-        return get_object_vars((object) array_merge($params, $this->__extras));
-
-        //        return get_object_vars((object) json_decode(json_encode(array_merge($params, $this->_extras))));
+        return array_merge($params, $this->__extras);
     }
 }

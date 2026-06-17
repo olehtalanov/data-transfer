@@ -16,6 +16,7 @@ use ReflectionProperty;
 use ReflectionType;
 use Talanov\DataTransfer\Attributes\Cast;
 use Talanov\DataTransfer\Attributes\MapInputName;
+use Talanov\DataTransfer\Attributes\Optional;
 use Talanov\DataTransfer\Concerns\CastInterface;
 use Talanov\DataTransfer\Traits\ResponseTrait;
 use Throwable;
@@ -77,6 +78,18 @@ abstract class DataTransferObject implements JsonSerializable
             $propertyName = $property->getName();
             $inputNameAttrs = $property->getAttributes(MapInputName::class);
             $inputKey = $inputNameAttrs !== [] ? $inputNameAttrs[0]->newInstance()->name : $propertyName;
+
+            $isProvided = array_key_exists($inputKey, $data);
+
+            if ($isProvided) {
+                $this->__provided[$propertyName] = true;
+            }
+
+            $optionalAttrs = $property->getAttributes(Optional::class);
+            if ($optionalAttrs !== [] && !$isProvided) {
+                continue;
+            }
+
             $value = $data[$inputKey] ?? null;
 
             $castAttrs = $property->getAttributes(Cast::class);

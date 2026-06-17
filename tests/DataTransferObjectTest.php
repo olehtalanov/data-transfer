@@ -12,6 +12,7 @@ use Talanov\DataTransfer\Tests\Support\CastedDto;
 use Talanov\DataTransfer\Tests\Support\HiddenDto;
 use Talanov\DataTransfer\Tests\Support\MappedDto;
 use Talanov\DataTransfer\Tests\Support\MappedInputDto;
+use Talanov\DataTransfer\Tests\Support\OptionalDto;
 use Talanov\DataTransfer\Tests\Support\SimpleDto;
 use Talanov\DataTransfer\Tests\Support\TestStatus;
 
@@ -234,5 +235,23 @@ final class DataTransferObjectTest extends TestCase
     {
         $dto = new CastedDto(['name' => 'test', 'currency' => 'usd', 'absolute' => 1, 'createdAt' => '']);
         $this->assertNull($dto->createdAt);
+    }
+
+    public function test_it_omits_optional_properties_not_provided(): void
+    {
+        $dto = new OptionalDto(['name' => 'John']);
+        $this->assertSame(['name' => 'John'], $dto->toArray());
+    }
+
+    public function test_it_includes_optional_properties_when_provided(): void
+    {
+        $dto = new OptionalDto(['name' => 'John', 'nickname' => 'Johnny']);
+        $this->assertSame(['name' => 'John', 'nickname' => 'Johnny'], $dto->toArray());
+    }
+
+    public function test_it_includes_optional_properties_when_null(): void
+    {
+        $dto = new OptionalDto(['name' => 'John', 'nickname' => null]);
+        $this->assertSame(['name' => 'John', 'nickname' => null], $dto->toArray());
     }
 }

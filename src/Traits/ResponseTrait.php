@@ -7,10 +7,12 @@ namespace Talanov\DataTransfer\Traits;
 use ReflectionProperty;
 use Talanov\DataTransfer\Attributes\Hidden;
 use Talanov\DataTransfer\Attributes\MapOutputName;
+use Talanov\DataTransfer\Attributes\Optional;
 
 trait ResponseTrait
 {
     protected array $__extras = [];
+    protected array $__provided = [];
 
     public function __isset(string $propertyName): bool
     {
@@ -62,6 +64,10 @@ trait ResponseTrait
         $params = [];
         foreach ($this->getReflection()->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
             if ($property->getAttributes(Hidden::class)) {
+                continue;
+            }
+
+            if ($property->getAttributes(Optional::class) && !isset($this->__provided[$property->getName()])) {
                 continue;
             }
 
